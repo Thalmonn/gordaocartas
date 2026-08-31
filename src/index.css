@@ -4,9 +4,22 @@
 
 body {
   @apply bg-tcg-background text-gray-200 font-sans antialiased;
-  /* Refletores sutis no fundo: Roxo à esquerda, Laranja à direita */
   background-image: 
     radial-gradient(circle at 15% 50%, rgba(157, 78, 221, 0.12), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(255, 107, 0, 0.1), transparent 25%);
   background-attachment: fixed;
+}
+
+/* Animação do Carrossel Infinito */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 30s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
 }
