@@ -66,6 +66,28 @@ function App() {
     setShippingInfo(null);
   };
 
+  const handleWhatsAppCheckout = () => {
+    // Coloque o seu número aqui (Ex: 55 DDD NÚMERO)
+    const phoneNumber = "5583998268170"; 
+    
+    // Monta a base da mensagem
+    let message = `Olá, Gordão Cartas! Tenho interesse no produto:\n\n*${selectedProduct.name}*\nValor: R$ ${selectedProduct.price.toFixed(2).replace('.', ',')}`;
+    
+    // Se o cliente digitou o CEP, inclui na mensagem para facilitar sua vida
+    if (cep) {
+      message += `\n\nMeu CEP é: ${cep}`;
+      if (shippingInfo) {
+        message += `\n(Simulação no site - PAC: R$ ${shippingInfo.pac.toFixed(2).replace('.', ',')} | Sedex: R$ ${shippingInfo.sedex.toFixed(2).replace('.', ',')})`;
+      }
+    } else {
+      message += `\n\nAinda não calculei o frete / Combinar entrega.`;
+    }
+
+    // Codifica a mensagem para formato de link e abre uma nova aba
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-tcg-background text-gray-200 font-sans relative overflow-x-hidden selection:bg-tcg-primary selection:text-white pb-20">
       
@@ -276,7 +298,10 @@ function App() {
                   </div>
                 )}
               </div>
-              <button className="mt-auto w-full bg-tcg-primary hover:bg-tcg-glow shadow-neon text-white font-bold py-4 rounded-xl transition-all duration-300 transform hover:-translate-y-1 flex justify-center items-center gap-2">
+              <button 
+                onClick={handleWhatsAppCheckout}
+                className="mt-auto w-full bg-tcg-primary hover:bg-tcg-glow shadow-neon text-white font-bold py-4 rounded-xl transition-all duration-300 transform hover:-translate-y-1 flex justify-center items-center gap-2"
+              >
                 Continuar no WhatsApp
               </button>
             </div>
