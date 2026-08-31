@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-tcg-background text-gray-200 font-sans antialiased;
+  /* Refletores sutis no fundo: Roxo à esquerda, Laranja à direita */
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(157, 78, 221, 0.12), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(255, 107, 0, 0.1), transparent 25%);
+  background-attachment: fixed;
+}
