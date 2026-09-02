@@ -18,18 +18,16 @@ function App() {
   const [shippingInfo, setShippingInfo] = useState(null);
   const [isLoadingCep, setIsLoadingCep] = useState(false);
 
-  // --- OTIMIZAÇÃO: ESTADO DE PAGINAÇÃO ---
   const INITIAL_VISIBLE_COUNT = 12;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
 
-  // --- GERADOR DE PRODUTO ---
   const [generatedJson, setGeneratedJson] = useState('');
   const [newProduct, setNewProduct] = useState({
     name: '', category: 'Cartas Avulsas', game: 'Pokémon TCG', expansion: '',
     condition: 'NM', price: '', image: '', featured: false, stock: 1
   });
 
-  // --- HISTÓRICO E NAVEGAÇÃO ---
+  // --- HISTÓRICO E NAVEGAÇÃO CORRIGIDOS ---
   useEffect(() => {
     const handlePopState = (event) => {
       if (!event.state || !event.state.modalOpen) {
@@ -48,7 +46,6 @@ function App() {
         setSearchQuery('');
       }
       setIsMobileMenuOpen(false);
-      // Sempre que navegar, reseta a paginação
       setVisibleCount(INITIAL_VISIBLE_COUNT);
     };
 
@@ -60,14 +57,22 @@ function App() {
   }, [currentView]);
 
   const navigateTo = (view, category, search = '') => {
-    if (currentView !== view || activeCategory !== category || searchQuery !== search) {
+    // FIX REAL DEFINITIVO: Remove literalmente o texto da rota da URL do navegador
+    const currentUrl = window.location.href;
+    
+    if (currentUrl.includes('/cadastrar/produto') && view !== 'CadastrarProduto') {
+      const cleanUrl = currentUrl.replace('/cadastrar/produto', '');
+      window.history.pushState({ view, category, search, modalOpen: false }, '', cleanUrl);
+    } 
+    else if (currentView !== view || activeCategory !== category || searchQuery !== search) {
       window.history.pushState({ view, category, search, modalOpen: false }, '');
     }
+    
     setCurrentView(view);
     setActiveCategory(category);
     setSearchQuery(search);
     setIsMobileMenuOpen(false);
-    setVisibleCount(INITIAL_VISIBLE_COUNT); // Otimização: Reseta a lista curta ao trocar de tela
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -86,9 +91,7 @@ function App() {
     }
   };
 
-  // --- OTIMIZAÇÃO: USEMEMO NA FILTRAGEM ---
-  // O React só vai recalcular os filtros se os dados, a busca ou a categoria mudarem.
-  // Digitar o CEP ou rolar a página não vai mais reprocessar a lista inteira.
+  // --- DADOS E FILTROS ---
   const filteredProducts = useMemo(() => {
     return productsData.filter(product => {
       const matchesCategory = activeCategory === 'Todos' || product.category === activeCategory;
@@ -100,7 +103,6 @@ function App() {
     });
   }, [activeCategory, searchQuery, productsData]);
 
-  // --- OTIMIZAÇÃO: FATIAMENTO (SLICE) DO CATÁLOGO ---
   const visibleProducts = useMemo(() => {
     return filteredProducts.slice(0, visibleCount);
   }, [filteredProducts, visibleCount]);
@@ -111,12 +113,9 @@ function App() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    if (searchQuery.trim() !== '') {
-      navigateTo('Catalog', 'Todos', searchQuery);
-    }
+    if (searchQuery.trim() !== '') navigateTo('Catalog', 'Todos', searchQuery);
   };
 
-  // --- INTEGRAÇÕES ---
   const handleCalculateShipping = async () => {
     const cleanCep = cep.replace(/\D/g, '');
     if (cleanCep.length !== 8) {
@@ -324,6 +323,9 @@ function App() {
         </main>
       )}
 
+      {/* ------------------------------------------------------------------ */}
+
+
       {/* RENDERIZAÇÃO DA PÁGINA "HOME" */}
       {currentView === 'Home' && (
         <div className="animate-fade-in flex-1">
@@ -355,7 +357,6 @@ function App() {
                 <div className="relative bg-tcg-surface backdrop-blur-xl border border-white/10 p-5 rounded-2xl shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:shadow-card-hover hover:border-tcg-accent/40">
                   <div className="w-full aspect-[4/5] bg-gray-900 rounded-xl mb-5 relative overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 -translate-x-full group-hover:translate-x-full z-10 pointer-events-none"></div>
-                    {/* OTIMIZAÇÃO: A Imagem de Capa (LCP) NÃO leva lazy load, para aparecer instantaneamente */}
                     <img src={featuredProduct.image} alt={featuredProduct.name} decoding="async" fetchPriority="high" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex justify-between items-start mb-4 gap-2">
@@ -401,7 +402,6 @@ function App() {
                     <div key={`track1-${index}`} onClick={() => openProductModal(product)} className="w-48 shrink-0 mx-3 relative group/card cursor-pointer transition-transform duration-300 hover:scale-105">
                       <div className="w-full aspect-[63/88] bg-gray-900 rounded-xl overflow-hidden border border-white/10 group-hover/card:border-tcg-primary/50 relative">
                         <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent opacity-0 group-hover/card:opacity-100 transition-all duration-500 -translate-x-full group-hover/card:translate-x-full z-10 pointer-events-none"></div>
-                        {/* OTIMIZAÇÃO: Lazy load para as cartas do carrossel */}
                         <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       </div>
                       <div className="mt-3 text-center">
@@ -469,14 +469,12 @@ function App() {
             </div>
           ) : (
             <>
-              {/* Grid Otimizado exibindo apenas a fatia visível */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {visibleProducts.map((product) => (
                   <div key={product.id} className="relative group bg-tcg-surface backdrop-blur-xl border border-white/10 p-4 rounded-2xl transition-all duration-500 hover:-translate-y-2 hover:shadow-card-hover hover:border-tcg-accent/40 flex flex-col h-full">
                     <div className="absolute top-6 right-6 z-20 bg-tcg-background/90 backdrop-blur-sm border border-white/10 text-gray-300 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{product.category}</div>
                     <div className="w-full aspect-[4/5] bg-gray-900 rounded-xl mb-4 relative overflow-hidden group">
                       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 -translate-x-full group-hover:translate-x-full z-10 pointer-events-none"></div>
-                      {/* OTIMIZAÇÃO: Lazy load obrigatório para a grade do catálogo */}
                       <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-grow flex flex-col justify-between">
@@ -497,7 +495,6 @@ function App() {
                 ))}
               </div>
 
-              {/* OTIMIZAÇÃO: Botão Carregar Mais */}
               {visibleCount < filteredProducts.length && (
                 <div className="mt-12 flex justify-center">
                   <button 
