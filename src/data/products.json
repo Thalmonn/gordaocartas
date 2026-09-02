@@ -5,11 +5,12 @@
     "category": "Cartas Avulsas",
     "game": "Pokémon TCG",
     "expansion": "Fusion Strike",
-    "condition": "Near Mint",
+    "condition": "NM",
     "price": 650.00,
     "image": "https://placehold.co/400x560/1C0F2D/FF6B00?text=Gengar+VMAX",
     "featured": true,
-    "inStock": true
+    "inStock": true,
+    "stock": 2
   },
   {
     "id": "2",
@@ -20,8 +21,9 @@
     "condition": "Novo/Lacrado",
     "price": 350.00,
     "image": "https://placehold.co/400x560/1C0F2D/FF6B00?text=ETB+Scarlet",
-    "featured": true,
-    "inStock": true
+    "featured": false,
+    "inStock": true,
+    "stock": 5
   },
   {
     "id": "3",
@@ -33,6 +35,20 @@
     "price": 85.00,
     "image": "https://placehold.co/400x560/1C0F2D/FF6B00?text=Dragon+Shield",
     "featured": false,
-    "inStock": true
+    "inStock": true,
+    "stock": 12
+  },
+  {
+    "id": "4",
+    "name": "Charizard ex",
+    "category": "Cartas Avulsas",
+    "game": "Pokémon TCG",
+    "expansion": "Obsidian Flames",
+    "condition": "NM",
+    "price": 180.00,
+    "image": "https://placehold.co/400x560/1C0F2D/FF6B00?text=Charizard+ex",
+    "featured": false,
+    "inStock": true,
+    "stock": 3
   }
 ]
