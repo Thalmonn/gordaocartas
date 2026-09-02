@@ -2,7 +2,14 @@ import { useState, useEffect } from 'react';
 import productsData from './data/products.json';
 
 function App() {
-  const [currentView, setCurrentView] = useState('Home');
+  // O sistema agora lê a URL ao carregar o site. Se contiver "/cadastrar/produto", ele abre o formulário.
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.href.includes('/cadastrar/produto')) {
+      return 'CadastrarProduto';
+    }
+    return 'Home';
+  });
+  
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -11,6 +18,13 @@ function App() {
   const [cep, setCep] = useState('');
   const [shippingInfo, setShippingInfo] = useState(null);
   const [isLoadingCep, setIsLoadingCep] = useState(false);
+
+  // --- ESTADOS DO GERADOR DE PRODUTO ---
+  const [generatedJson, setGeneratedJson] = useState('');
+  const [newProduct, setNewProduct] = useState({
+    name: '', category: 'Cartas Avulsas', game: 'Pokémon TCG', expansion: '',
+    condition: 'NM', price: '', image: '', featured: false, stock: 1
+  });
 
   // --- HISTÓRICO E NAVEGAÇÃO ---
   useEffect(() => {
@@ -25,7 +39,8 @@ function App() {
         setActiveCategory(event.state.category || 'Todos');
         setSearchQuery(event.state.search || '');
       } else {
-        setCurrentView('Home');
+        const isCadastrar = window.location.href.includes('/cadastrar/produto');
+        setCurrentView(isCadastrar ? 'CadastrarProduto' : 'Home');
         setActiveCategory('Todos');
         setSearchQuery('');
       }
@@ -34,10 +49,10 @@ function App() {
 
     window.addEventListener('popstate', handlePopState);
     if (!window.history.state) {
-      window.history.replaceState({ view: 'Home', category: 'Todos', search: '', modalOpen: false }, '');
+      window.history.replaceState({ view: currentView, category: 'Todos', search: '', modalOpen: false }, '');
     }
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [currentView]);
 
   const navigateTo = (view, category, search = '') => {
     if (currentView !== view || activeCategory !== category || searchQuery !== search) {
@@ -76,7 +91,6 @@ function App() {
   });
 
   const featuredProduct = productsData.find(product => product.featured) || productsData[0];
-  
   const baseCarouselCards = productsData.filter(product => product.category === 'Cartas Avulsas');
   const carouselTrack = [...baseCarouselCards, ...baseCarouselCards, ...baseCarouselCards, ...baseCarouselCards];
 
@@ -87,6 +101,7 @@ function App() {
     }
   };
 
+  // --- INTEGRAÇÕES ---
   const handleCalculateShipping = async () => {
     const cleanCep = cep.replace(/\D/g, '');
     if (cleanCep.length !== 8) {
@@ -104,7 +119,7 @@ function App() {
         setShippingInfo({ city: data.localidade, state: data.uf, pac: 25.90, sedex: 45.50 });
       }
     } catch (error) {
-      console.error("Erro na integração com ViaCEP:", error);
+      console.error("Erro no ViaCEP:", error);
       alert("Erro ao buscar o CEP.");
     } finally {
       setIsLoadingCep(false);
@@ -123,27 +138,47 @@ function App() {
     window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  // --- LÓGICA DE GERAÇÃO DO PRODUTO ---
+  const handleGenerateJson = (e) => {
+    e.preventDefault();
+    const finalProduct = {
+      id: Date.now().toString(),
+      name: newProduct.name,
+      category: newProduct.category,
+      game: newProduct.game,
+      expansion: newProduct.expansion,
+      condition: newProduct.condition,
+      price: parseFloat(newProduct.price.replace(',', '.')),
+      image: newProduct.image || "https://placehold.co/400x560/1C0F2D/FF6B00?text=Sem+Foto",
+      featured: newProduct.featured,
+      inStock: newProduct.stock > 0,
+      stock: parseInt(newProduct.stock)
+    };
+    
+    // Gera exatamente o bloco individual formatado, com a vírgula no final
+    setGeneratedJson(JSON.stringify(finalProduct, null, 2) + ',');
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-tcg-background text-gray-200 font-sans relative overflow-x-hidden selection:bg-tcg-primary selection:text-white">
       
       {/* CABEÇALHO GLOBAL */}
       <header className="fixed w-full top-0 z-50 bg-tcg-background/90 backdrop-blur-md border-b border-white/5 py-3 px-4 md:px-12 flex justify-between items-center gap-4">
-        
-        {/* LOGO */}
         <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('Home', 'Todos'); }} className="text-xl md:text-2xl font-black tracking-tighter text-white hover:opacity-80 transition-opacity shrink-0">
           GORDÃO <span className="text-transparent bg-clip-text bg-gradient-to-r from-tcg-primary to-orange-400">CARTAS</span>
         </a>
 
-        {/* BARRA DE BUSCA CENTRAL */}
-        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl mx-auto hidden md:block">
-          <input 
-            type="text"
-            placeholder="O que você procura para a sua coleção?"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 focus:border-tcg-primary focus:bg-white/10 rounded-full px-6 py-2.5 text-sm md:text-base font-medium text-white placeholder-gray-400 transition-all shadow-[0_4px_30px_rgba(0,0,0,0.1)] outline-none text-center"
-          />
-        </form>
+        {currentView !== 'CadastrarProduto' && (
+          <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl mx-auto hidden md:block">
+            <input 
+              type="text"
+              placeholder="O que você procura para a sua coleção?"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 focus:border-tcg-primary focus:bg-white/10 rounded-full px-6 py-2.5 text-sm md:text-base font-medium text-white placeholder-gray-400 transition-all shadow-[0_4px_30px_rgba(0,0,0,0.1)] outline-none text-center"
+            />
+          </form>
+        )}
 
         <div className="flex items-center gap-6 shrink-0">
           <nav className="hidden xl:flex gap-6 text-sm font-medium text-gray-400">
@@ -161,28 +196,17 @@ function App() {
               </a>
             ))}
           </nav>
-
-          {/* MENU HAMBURGER */}
-          <button 
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-white hover:text-tcg-primary transition-colors focus:outline-none p-1 block"
-            aria-label="Abrir Menu Lateral"
-          >
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white hover:text-tcg-primary transition-colors focus:outline-none p-1 block">
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isMobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
+              {isMobileMenuOpen ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />}
             </svg>
           </button>
         </div>
       </header>
 
-      {/* CORTINA LATERAL (MENU HAMBURGER ABERTO) */}
+      {/* CORTINA LATERAL */}
       <div className={`fixed inset-0 z-40 flex justify-end transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
-        
         <div className={`relative w-80 max-w-full bg-tcg-background border-l border-white/10 h-full shadow-2xl flex flex-col transition-transform duration-300 transform ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="flex justify-between items-center p-6 border-b border-white/5">
             <h2 className="text-xl font-black text-white">Menu</h2>
@@ -190,36 +214,106 @@ function App() {
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
-          
           <div className="p-4 md:hidden">
             <form onSubmit={handleSearchSubmit} className="w-full">
-              <input 
-                type="text"
-                placeholder="Buscar itens..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm font-medium text-white placeholder-gray-400 focus:outline-none focus:border-tcg-primary"
-              />
+              <input type="text" placeholder="Buscar itens..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm font-medium text-white placeholder-gray-400 focus:outline-none focus:border-tcg-primary" />
             </form>
           </div>
-
           <nav className="flex flex-col p-4 gap-1">
             <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('Home', 'Todos'); }} className={`px-4 py-3 rounded-lg text-lg font-medium transition-all ${currentView === 'Home' ? 'bg-tcg-primary/10 text-tcg-primary border-l-2 border-tcg-primary' : 'text-gray-300 hover:bg-white/5 hover:text-white border-l-2 border-transparent'}`}>
               Início
             </a>
             {['Cartas Avulsas', 'Decks & Selados', 'Acessórios'].map(category => (
-              <a 
-                key={category} 
-                href="#" 
-                onClick={(e) => { e.preventDefault(); navigateTo('Catalog', category); }} 
-                className={`px-4 py-3 rounded-lg text-lg font-medium transition-all ${(currentView === 'Catalog' && activeCategory === category) ? 'bg-tcg-primary/10 text-tcg-primary border-l-2 border-tcg-primary' : 'text-gray-300 hover:bg-white/5 hover:text-white border-l-2 border-transparent'}`}
-              >
+              <a key={category} href="#" onClick={(e) => { e.preventDefault(); navigateTo('Catalog', category); }} className={`px-4 py-3 rounded-lg text-lg font-medium transition-all ${(currentView === 'Catalog' && activeCategory === category) ? 'bg-tcg-primary/10 text-tcg-primary border-l-2 border-tcg-primary' : 'text-gray-300 hover:bg-white/5 hover:text-white border-l-2 border-transparent'}`}>
                 {category}
               </a>
             ))}
           </nav>
         </div>
       </div>
+
+      {/* ---------------- PÁGINA: CADASTRAR PRODUTO ---------------- */}
+      {currentView === 'CadastrarProduto' && (
+        <main className="pt-32 px-6 md:px-12 pb-16 max-w-3xl mx-auto flex-1 w-full animate-fade-in">
+          <div className="mb-8 border-b border-white/10 pb-4">
+            <h2 className="text-4xl font-black text-white">Cadastrar Produto</h2>
+            <p className="text-gray-400 mt-1">Gerador de bloco JSON formatado</p>
+          </div>
+
+          <div className="bg-tcg-surface border border-white/10 p-6 md:p-8 rounded-2xl shadow-2xl">
+            <form onSubmit={handleGenerateJson} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Nome do Produto</label>
+                  <input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-tcg-primary outline-none" placeholder="Ex: Charizard Base Set" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Preço (R$)</label>
+                  <input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-tcg-primary outline-none" placeholder="Ex: 150.50" />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Categoria</label>
+                  <select value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-tcg-primary outline-none">
+                    <option>Cartas Avulsas</option>
+                    <option>Decks & Selados</option>
+                    <option>Acessórios</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Estoque (Unidades)</label>
+                  <input required type="number" min="0" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-tcg-primary outline-none" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Jogo / Franquia</label>
+                  <input type="text" value={newProduct.game} onChange={e => setNewProduct({...newProduct, game: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-tcg-primary outline-none" placeholder="Ex: Pokémon TCG" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Expansão</label>
+                  <input type="text" value={newProduct.expansion} onChange={e => setNewProduct({...newProduct, expansion: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-tcg-primary outline-none" placeholder="Ex: Obsidian Flames" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Condição</label>
+                  <input type="text" value={newProduct.condition} onChange={e => setNewProduct({...newProduct, condition: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-tcg-primary outline-none" placeholder="Ex: NM, LP, Novo/Lacrado" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">URL da Imagem</label>
+                  <input type="text" value={newProduct.image} onChange={e => setNewProduct({...newProduct, image: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-tcg-primary outline-none" placeholder="Cole o link de uma imagem online" />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="featured" checked={newProduct.featured} onChange={e => setNewProduct({...newProduct, featured: e.target.checked})} className="w-4 h-4 accent-tcg-primary" />
+                <label htmlFor="featured" className="text-sm font-medium text-gray-300">Destacar este produto na Capa do site?</label>
+              </div>
+
+              <button type="submit" className="w-full bg-tcg-primary hover:bg-tcg-glow shadow-neon text-white font-bold py-4 rounded-xl transition-all duration-300">
+                Gerar Bloco de Código
+              </button>
+            </form>
+
+            {generatedJson && (
+              <div className="mt-8 animate-fade-in">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-bold text-green-400 uppercase">Código Gerado com Sucesso!</label>
+                  <button onClick={() => navigator.clipboard.writeText(generatedJson)} className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded transition-colors">Copiar</button>
+                </div>
+                <p className="text-[10px] text-gray-400 mb-2">Copie o bloco abaixo e cole dentro dos colchetes <code>[ ]</code> no arquivo <code>src/data/products.json</code>.</p>
+                <textarea 
+                  readOnly 
+                  value={generatedJson} 
+                  className="w-full h-80 bg-black/80 border border-white/10 rounded-lg p-4 text-sm text-green-300 font-mono focus:outline-none resize-none"
+                />
+              </div>
+            )}
+          </div>
+        </main>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+
 
       {/* RENDERIZAÇÃO DA PÁGINA "HOME" */}
       {currentView === 'Home' && (
@@ -276,13 +370,11 @@ function App() {
             )}
           </section>
 
-          {/* CARROSSEL INFINITO */}
           {baseCarouselCards.length > 0 && (
             <section className="py-16 border-y border-white/5 bg-black/30 relative w-full overflow-hidden">
               <div className="absolute left-0 top-0 bottom-0 w-16 md:w-32 bg-gradient-to-r from-tcg-background to-transparent z-10 pointer-events-none"></div>
               <div className="absolute right-0 top-0 bottom-0 w-16 md:w-32 bg-gradient-to-l from-tcg-background to-transparent z-10 pointer-events-none"></div>
               
-              {/* NOVO TÍTULO ELEGANTE SEM CORES BERRANTES */}
               <div className="relative z-20 flex flex-col items-center mb-12 text-center px-4">
                 <h2 className="text-2xl md:text-4xl font-black text-gray-200 uppercase tracking-[0.15em]">
                   Cartas Avulsas
@@ -304,9 +396,7 @@ function App() {
                       <div className="mt-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <h4 className="text-sm font-bold text-white truncate">{product.name}</h4>
-                          {product.condition && (
-                            <span className="text-[10px] font-bold text-tcg-primary bg-tcg-primary/10 px-1 rounded">{product.condition}</span>
-                          )}
+                          {product.condition && <span className="text-[10px] font-bold text-tcg-primary bg-tcg-primary/10 px-1 rounded">{product.condition}</span>}
                         </div>
                         <span className="text-tcg-primary font-black text-sm">R$ {product.price.toFixed(2).replace('.', ',')}</span>
                       </div>
@@ -324,9 +414,7 @@ function App() {
                       <div className="mt-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <h4 className="text-sm font-bold text-white truncate">{product.name}</h4>
-                          {product.condition && (
-                            <span className="text-[10px] font-bold text-tcg-primary bg-tcg-primary/10 px-1 rounded">{product.condition}</span>
-                          )}
+                          {product.condition && <span className="text-[10px] font-bold text-tcg-primary bg-tcg-primary/10 px-1 rounded">{product.condition}</span>}
                         </div>
                         <span className="text-tcg-primary font-black text-sm">R$ {product.price.toFixed(2).replace('.', ',')}</span>
                       </div>
@@ -346,9 +434,7 @@ function App() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b border-white/10 pb-4 gap-4">
             <div>
               <h2 className="text-4xl font-black text-white">Catálogo</h2>
-              <p className="text-gray-400 mt-1">
-                {searchQuery ? `Resultados para: "${searchQuery}"` : `Navegando em: ${activeCategory}`}
-              </p>
+              <p className="text-gray-400 mt-1">{searchQuery ? `Resultados para: "${searchQuery}"` : `Navegando em: ${activeCategory}`}</p>
             </div>
             
             <div className="flex gap-2 bg-black/30 p-1 rounded-lg border border-white/5 overflow-x-auto w-full md:w-auto">
@@ -374,9 +460,7 @@ function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredProducts.map((product) => (
                 <div key={product.id} className="relative group bg-tcg-surface backdrop-blur-xl border border-white/10 p-4 rounded-2xl transition-all duration-500 hover:-translate-y-2 hover:shadow-card-hover hover:border-tcg-accent/40 flex flex-col h-full">
-                  <div className="absolute top-6 right-6 z-20 bg-tcg-background/90 backdrop-blur-sm border border-white/10 text-gray-300 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">
-                    {product.category}
-                  </div>
+                  <div className="absolute top-6 right-6 z-20 bg-tcg-background/90 backdrop-blur-sm border border-white/10 text-gray-300 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{product.category}</div>
                   <div className="w-full aspect-[4/5] bg-gray-900 rounded-xl mb-4 relative overflow-hidden group">
                     <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 -translate-x-full group-hover:translate-x-full z-10 pointer-events-none"></div>
                     <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
@@ -385,24 +469,14 @@ function App() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-lg font-bold text-white group-hover:text-purple-200 transition-colors leading-tight">{product.name}</h3>
-                        {product.condition && (
-                          <span className="bg-tcg-primary/20 text-tcg-primary border border-tcg-primary/30 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                            {product.condition}
-                          </span>
-                        )}
+                        {product.condition && <span className="bg-tcg-primary/20 text-tcg-primary border border-tcg-primary/30 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">{product.condition}</span>}
                       </div>
                       <p className="text-xs text-gray-400 mb-2">{product.game} {product.expansion && `• ${product.expansion}`}</p>
-                      
-                      <p className="text-[11px] text-gray-400 mb-3">
-                        Estoque: <strong className="text-gray-200">{product.stock} un.</strong>
-                      </p>
+                      <p className="text-[11px] text-gray-400 mb-3">Estoque: <strong className="text-gray-200">{product.stock} un.</strong></p>
                     </div>
-
                     <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
                       <span className="text-xl font-black text-tcg-primary">R$ {product.price.toFixed(2).replace('.', ',')}</span>
-                      <button onClick={() => openProductModal(product)} className="bg-white/5 hover:bg-tcg-primary hover:text-white border border-white/10 hover:border-tcg-primary text-gray-300 font-medium py-2 px-4 rounded-lg transition-all duration-300 text-sm">
-                        Comprar
-                      </button>
+                      <button onClick={() => openProductModal(product)} className="bg-white/5 hover:bg-tcg-primary hover:text-white border border-white/10 hover:border-tcg-primary text-gray-300 font-medium py-2 px-4 rounded-lg transition-all duration-300 text-sm">Comprar</button>
                     </div>
                   </div>
                 </div>
@@ -424,19 +498,11 @@ function App() {
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <h2 className="text-2xl font-black text-white">{selectedProduct.name}</h2>
-                  {selectedProduct.condition && (
-                    <span className="bg-tcg-primary/20 text-tcg-primary border border-tcg-primary/30 text-xs font-bold px-2 py-0.5 rounded">
-                      Condição: {selectedProduct.condition}
-                    </span>
-                  )}
+                  {selectedProduct.condition && <span className="bg-tcg-primary/20 text-tcg-primary border border-tcg-primary/30 text-xs font-bold px-2 py-0.5 rounded">Condição: {selectedProduct.condition}</span>}
                   {selectedProduct.stock > 0 ? (
-                    <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs uppercase font-bold px-2 py-0.5 rounded">
-                      Em Estoque ({selectedProduct.stock} un.)
-                    </span>
+                    <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs uppercase font-bold px-2 py-0.5 rounded">Em Estoque ({selectedProduct.stock} un.)</span>
                   ) : (
-                    <span className="bg-red-500/20 text-red-400 border border-red-500/30 text-xs uppercase font-bold px-2 py-0.5 rounded">
-                      Esgotado
-                    </span>
+                    <span className="bg-red-500/20 text-red-400 border border-red-500/30 text-xs uppercase font-bold px-2 py-0.5 rounded">Esgotado</span>
                   )}
                 </div>
                 <p className="text-sm text-gray-400">{selectedProduct.game} {selectedProduct.expansion && `• ${selectedProduct.expansion}`}</p>
@@ -462,21 +528,12 @@ function App() {
                 {shippingInfo && (
                   <div className="mt-4 text-sm bg-black/30 p-3 rounded-lg border border-white/5">
                     <p className="text-gray-300 mb-2">Envio para <strong className="text-white">{shippingInfo.city} - {shippingInfo.state}</strong></p>
-                    <div className="flex justify-between items-center py-1 border-b border-white/5">
-                      <span className="text-gray-400">PAC (Simulado)</span>
-                      <strong className="text-white">R$ {shippingInfo.pac.toFixed(2).replace('.', ',')}</strong>
-                    </div>
-                    <div className="flex justify-between items-center py-1">
-                      <span className="text-gray-400">Sedex (Simulado)</span>
-                      <strong className="text-white">R$ {shippingInfo.sedex.toFixed(2).replace('.', ',')}</strong>
-                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-white/5"><span className="text-gray-400">PAC (Simulado)</span><strong className="text-white">R$ {shippingInfo.pac.toFixed(2).replace('.', ',')}</strong></div>
+                    <div className="flex justify-between items-center py-1"><span className="text-gray-400">Sedex (Simulado)</span><strong className="text-white">R$ {shippingInfo.sedex.toFixed(2).replace('.', ',')}</strong></div>
                   </div>
                 )}
               </div>
-              <button 
-                onClick={handleWhatsAppCheckout}
-                className="mt-auto w-full bg-tcg-primary hover:bg-tcg-glow shadow-neon text-white font-bold py-4 rounded-xl transition-all duration-300 transform hover:-translate-y-1 flex justify-center items-center gap-2"
-              >
+              <button onClick={handleWhatsAppCheckout} className="mt-auto w-full bg-tcg-primary hover:bg-tcg-glow shadow-neon text-white font-bold py-4 rounded-xl transition-all duration-300 transform hover:-translate-y-1 flex justify-center items-center gap-2">
                 Continuar no WhatsApp
               </button>
             </div>
