@@ -14,6 +14,7 @@ function App() {
   
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
+  const [cardNameFilter, setCardNameFilter] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   
@@ -142,6 +143,7 @@ function App() {
     setCurrentView(view);
     setActiveCategory(category);
     setSearchQuery(search);
+    setCardNameFilter('');
     setIsMobileMenuOpen(false);
     setIsFilterDropdownOpen(false);
     setIsCartOpen(false);
@@ -174,6 +176,9 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const cardNameTerm = cardNameFilter.trim().toLowerCase();
+  const isNameFilterActive = activeCategory === 'Cartas Avulsas' && cardNameTerm.length >= 3;
+
   const filteredProducts = useMemo(() => {
     return productsData.filter(product => {
       const matchesCategory = activeCategory === 'Todos' || product.category === activeCategory;
@@ -181,9 +186,10 @@ function App() {
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (product.game && product.game.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (product.expansion && product.expansion.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesCategory && matchesSearch;
+      const matchesName = !isNameFilterActive || product.name.toLowerCase().includes(cardNameTerm);
+      return matchesCategory && matchesSearch && matchesName;
     });
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, cardNameFilter, isNameFilterActive, cardNameTerm]);
 
   const visibleProducts = useMemo(() => {
     return filteredProducts.slice(0, visibleCount);
@@ -649,6 +655,16 @@ function App() {
               )}
             </div>
           </div>
+
+          {activeCategory === 'Cartas Avulsas' && (
+            <input
+              type="text"
+              placeholder="Filtrar cartas pelo nome (a partir de 3 letras)..."
+              value={cardNameFilter}
+              onChange={(e) => { setCardNameFilter(e.target.value); setVisibleCount(INITIAL_VISIBLE_COUNT); }}
+              className="w-full md:max-w-md mb-8 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-base md:text-sm font-medium text-white placeholder-gray-400 focus:outline-none focus:border-tcg-primary"
+            />
+          )}
 
           {visibleProducts.length === 0 ? (
             <div className="text-center py-20 bg-tcg-surface/30 rounded-3xl border border-white/5">
