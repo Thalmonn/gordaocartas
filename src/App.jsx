@@ -1,8 +1,27 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import productsData from './data/products.json';
 import banner1 from './assets/banner1.webp';
 import banner2 from './assets/banner2.webp';
 import banner3 from './assets/banner3.webp';
+
+const getCardNumber = (product) => {
+  if (!product) return '';
+  if (product.number) return product.number.toString();
+  if (product.image) {
+    const match = product.image.match(/\/[^/]+_([0-9a-zA-Z]+)_R_/);
+    if (match && match[1]) return match[1];
+  }
+  return '';
+};
+
+const formatWhatsappCardDetails = (product) => {
+  const details = [];
+  if (product.expansion) details.push(`Col: ${product.expansion}`);
+  const cardNum = getCardNumber(product);
+  if (cardNum) details.push(`#${cardNum}`);
+  if (product.condition) details.push(product.condition);
+  return details.length > 0 ? `[${details.join(' | ')}]` : '';
+};
 
 function App() {
   const [currentView, setCurrentView] = useState(() => {
@@ -24,6 +43,8 @@ function App() {
 
   const INITIAL_VISIBLE_COUNT = 12;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
+
+  const modalHistoryPushedRef = useRef(false);
 
   const [generatedJson, setGeneratedJson] = useState('');
   const [newProduct, setNewProduct] = useState({
@@ -62,8 +83,8 @@ function App() {
       }
       return [...prev, { ...product, qty: 1 }];
     });
-    setIsCartOpen(true);
     closeProductModal();
+    setIsCartOpen(true);
   };
 
   const updateCartQty = (productId, delta) => {
@@ -83,11 +104,13 @@ function App() {
     const phoneNumber = "5583998268170";
     let message = `Olá, Gordão Cartas! Quero finalizar meu pedido:\n\n`;
     cart.forEach(item => {
-      message += `▪️ ${item.qty}x ${item.name} R$ ${(item.price * item.qty).toFixed(2).replace('.', ',')}\n`;
+      const details = formatWhatsappCardDetails(item);
+      const itemTotal = (item.price * item.qty).toFixed(2).replace('.', ',');
+      message += `- ${item.qty}x ${item.name} ${details ? `${details} ` : ''}- R$ ${itemTotal}\n`;
     });
     message += `\n*TOTAL:* R$ ${cartTotal.toFixed(2).replace('.', ',')}`;
-    message += `\n\nPor favor, me informe as opções de pagamento e de entrega.`;
-    window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
+    message += `\n\nPor favor, me informem o frete e as opções de pagamento.`;
+    window.open(`https://api.whatsapp.com/send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`, '_blank');
   };
 
   useEffect(() => {
@@ -102,30 +125,38 @@ function App() {
 
   useEffect(() => {
     const handlePopState = (event) => {
-      if (!event.state || !event.state.modalOpen) {
+      if (modalHistoryPushedRef.current) {
+        modalHistoryPushedRef.current = false;
         setSelectedProduct(null);
         setCep('');
         setShippingInfo(null);
+        return;
       }
+
+      setSelectedProduct(null);
+      setCep('');
+      setShippingInfo(null);
+
       if (event.state) {
         setCurrentView(event.state.view || 'Home');
         setActiveCategory(event.state.category || 'Todos');
         setSearchQuery(event.state.search || '');
+        setVisibleCount(event.state.visibleCount || INITIAL_VISIBLE_COUNT);
       } else {
         const isCadastrar = window.location.href.includes('/cadastrar/produto');
         setCurrentView(isCadastrar ? 'CadastrarProduto' : 'Home');
         setActiveCategory('Todos');
         setSearchQuery('');
+        setVisibleCount(INITIAL_VISIBLE_COUNT);
       }
       setIsMobileMenuOpen(false);
       setIsFilterDropdownOpen(false);
       setIsCartOpen(false);
-      setVisibleCount(INITIAL_VISIBLE_COUNT);
     };
 
     window.addEventListener('popstate', handlePopState);
     if (!window.history.state) {
-      window.history.replaceState({ view: currentView, category: 'Todos', search: '', modalOpen: false }, '');
+      window.history.replaceState({ view: currentView, category: 'Todos', search: '', visibleCount: INITIAL_VISIBLE_COUNT, modalOpen: false }, '');
     }
     return () => window.removeEventListener('popstate', handlePopState);
   }, [currentView]);
@@ -134,10 +165,10 @@ function App() {
     const currentUrl = window.location.href;
     if (currentUrl.includes('/cadastrar/produto') && view !== 'CadastrarProduto') {
       const cleanUrl = currentUrl.replace('/cadastrar/produto', '');
-      window.history.pushState({ view, category, search, modalOpen: false }, '', cleanUrl);
+      window.history.pushState({ view, category, search, visibleCount: INITIAL_VISIBLE_COUNT, modalOpen: false }, '', cleanUrl);
     } 
     else if (currentView !== view || activeCategory !== category || searchQuery !== search) {
-      window.history.pushState({ view, category, search, modalOpen: false }, '');
+      window.history.pushState({ view, category, search, visibleCount: INITIAL_VISIBLE_COUNT, modalOpen: false }, '');
     }
     setCurrentView(view);
     setActiveCategory(category);
@@ -150,37 +181,53 @@ function App() {
   };
 
   const openProductModal = (product) => {
+    window.history.replaceState({
+      view: currentView,
+      category: activeCategory,
+      search: searchQuery,
+      visibleCount: visibleCount,
+      modalOpen: false
+    }, '');
+    modalHistoryPushedRef.current = true;
     setSelectedProduct(product);
-    window.history.pushState({ view: currentView, category: activeCategory, search: searchQuery, modalOpen: true }, '');
+    window.history.pushState({
+      view: currentView,
+      category: activeCategory,
+      search: searchQuery,
+      visibleCount: visibleCount,
+      modalOpen: true
+    }, '');
   };
 
   const closeProductModal = () => {
-    if (window.history.state && window.history.state.modalOpen) {
+    setSelectedProduct(null);
+    setCep('');
+    setShippingInfo(null);
+    if (modalHistoryPushedRef.current) {
       window.history.back();
-    } else {
-      setSelectedProduct(null);
-      setCep('');
-      setShippingInfo(null);
     }
   };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && selectedProduct) {
         closeProductModal();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [selectedProduct]);
 
   const filteredProducts = useMemo(() => {
     return productsData.filter(product => {
       const matchesCategory = activeCategory === 'Todos' || product.category === activeCategory;
+      const cardNum = getCardNumber(product);
+      const q = searchQuery.toLowerCase();
       const matchesSearch = searchQuery === '' || 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (product.game && product.game.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (product.expansion && product.expansion.toLowerCase().includes(searchQuery.toLowerCase()));
+        product.name.toLowerCase().includes(q) ||
+        (product.game && product.game.toLowerCase().includes(q)) ||
+        (product.expansion && product.expansion.toLowerCase().includes(q)) ||
+        (cardNum && cardNum.toLowerCase().includes(q));
       return matchesCategory && matchesSearch;
     });
   }, [activeCategory, searchQuery]);
@@ -190,11 +237,9 @@ function App() {
   }, [filteredProducts, visibleCount]);
 
   const featuredProduct = useMemo(() => productsData.find(product => product.featured === true) || null, []);
-  
   const baseCarouselCards = useMemo(() => productsData.filter(product => product.featured === true), []);
   const carouselTrack = [...baseCarouselCards, ...baseCarouselCards, ...baseCarouselCards, ...baseCarouselCards];
-  
-  const carouselAnimationDuration = carouselTrack.length > 0 ? `${carouselTrack.length * 15}s` : '150s';
+  const carouselAnimationDuration = carouselTrack.length > 0 ? `${carouselTrack.length * 3}s` : '30s';
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -227,14 +272,15 @@ function App() {
 
   const handleWhatsAppCheckout = () => {
     const phoneNumber = "5583998268170"; 
-    let message = `Olá, Gordão Cartas! Tenho interesse no produto:\n\n*${selectedProduct.name}*\nValor: R$ ${selectedProduct.price.toFixed(2).replace('.', ',')}`;
+    const details = formatWhatsappCardDetails(selectedProduct);
+    let message = `Olá, Gordão Cartas! Tenho interesse no produto:\n\n*${selectedProduct.name}* ${details}\nValor: R$ ${selectedProduct.price.toFixed(2).replace('.', ',')}`;
     if (cep) {
       message += `\n\nMeu CEP é: ${cep}`;
       if (shippingInfo) message += `\n(Simulação no site - PAC: R$ ${shippingInfo.pac.toFixed(2).replace('.', ',')} | Sedex: R$ ${shippingInfo.sedex.toFixed(2).replace('.', ',')})`;
     } else {
       message += `\n\nAinda não calculei o frete / Combinar entrega.`;
     }
-    window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const handleGenerateJson = (e) => {
@@ -308,6 +354,7 @@ function App() {
         </div>
       </header>
 
+      {/* DRAWER DO CARRINHO */}
       <div className={`fixed inset-0 z-[60] flex justify-end transition-opacity duration-300 ${isCartOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
         <div className={`relative w-96 max-w-full bg-tcg-background border-l border-white/10 h-full shadow-2xl flex flex-col transition-transform duration-300 transform ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -327,28 +374,35 @@ function App() {
                 <p>Seu carrinho está vazio.</p>
               </div>
             ) : (
-              cart.map(item => (
-                <div key={item.id} className="flex gap-4 bg-white/5 border border-white/10 p-3 rounded-xl relative group">
-                  <img src={item.image} alt={item.name} className="w-14 aspect-[460/640] object-contain rounded-md bg-transparent" />
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-white line-clamp-1">{item.name}</h4>
-                      <p className="text-xs text-gray-400">{item.condition} {item.expansion ? `• ${item.expansion}` : ''}</p>
-                    </div>
-                    <div className="flex justify-between items-end">
-                      <span className="text-tcg-primary font-bold text-sm">R$ {item.price.toFixed(2).replace('.', ',')}</span>
-                      <div className="flex items-center bg-black/50 rounded-lg border border-white/10 overflow-hidden">
-                        <button onClick={() => updateCartQty(item.id, -1)} className="px-2 py-1 text-gray-400 hover:text-white hover:bg-white/10 transition-colors">-</button>
-                        <span className="px-2 text-xs font-bold text-white w-6 text-center">{item.qty}</span>
-                        <button onClick={() => updateCartQty(item.id, 1)} className="px-2 py-1 text-gray-400 hover:text-white hover:bg-white/10 transition-colors">+</button>
+              cart.map(item => {
+                const cardNum = getCardNumber(item);
+                return (
+                  <div key={item.id} className="flex gap-4 bg-white/5 border border-white/10 p-3 rounded-xl relative group">
+                    <img src={item.image} alt={item.name} className="w-14 aspect-[460/640] object-contain rounded-md bg-transparent" />
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-white line-clamp-1">{item.name}</h4>
+                        <p className="text-xs text-gray-400">
+                          {item.condition}
+                          {item.expansion ? ` • ${item.expansion}` : ''}
+                          {cardNum ? ` #${cardNum}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-end">
+                        <span className="text-tcg-primary font-bold text-sm">R$ {item.price.toFixed(2).replace('.', ',')}</span>
+                        <div className="flex items-center bg-black/50 rounded-lg border border-white/10 overflow-hidden">
+                          <button onClick={() => updateCartQty(item.id, -1)} className="px-2 py-1 text-gray-400 hover:text-white hover:bg-white/10 transition-colors">-</button>
+                          <span className="px-2 text-xs font-bold text-white w-6 text-center">{item.qty}</span>
+                          <button onClick={() => updateCartQty(item.id, 1)} className="px-2 py-1 text-gray-400 hover:text-white hover:bg-white/10 transition-colors">+</button>
+                        </div>
                       </div>
                     </div>
+                    <button onClick={() => removeFromCart(item.id)} className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-lg transition-colors">
+                      ✕
+                    </button>
                   </div>
-                  <button onClick={() => removeFromCart(item.id)} className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-lg transition-colors">
-                    ✕
-                  </button>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
@@ -370,6 +424,7 @@ function App() {
         </div>
       </div>
 
+      {/* MENU MOBILE */}
       <div className={`fixed inset-0 z-40 flex justify-end transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
         <div className={`relative w-80 max-w-full bg-tcg-background border-l border-white/10 h-full shadow-2xl flex flex-col transition-transform duration-300 transform ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -536,7 +591,10 @@ function App() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">{featuredProduct.expansion}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {featuredProduct.expansion}
+                        {getCardNumber(featuredProduct) ? ` #${getCardNumber(featuredProduct)}` : ''}
+                      </p>
                     </div>
                     <span className="text-lg font-black text-tcg-primary shrink-0">R$ {featuredProduct.price.toFixed(2).replace('.', ',')}</span>
                   </div>
@@ -659,42 +717,43 @@ function App() {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-6">
-                {visibleProducts.map((product) => (
-                  <div key={product.id} className="relative group bg-tcg-surface backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl sm:rounded-3xl transition-all duration-500 hover:-translate-y-2 hover:shadow-card-hover hover:border-tcg-accent/40 flex flex-col h-full">
-                    
-                    {/* Badge da Categoria - Menor no mobile */}
-                    <div className="absolute top-3 right-3 sm:top-6 sm:right-6 z-20 bg-tcg-background/90 backdrop-blur-sm border border-white/10 text-gray-300 text-[8px] sm:text-[10px] font-bold px-1.5 py-0.5 sm:px-2 sm:py-1 rounded uppercase tracking-wider">{product.category}</div>
-                    
-                    {/* Imagem */}
-                    <div 
-                      className="w-full aspect-[460/640] bg-transparent rounded-lg sm:rounded-xl mb-3 sm:mb-4 relative overflow-hidden group flex items-center justify-center cursor-pointer"
-                      onClick={() => openProductModal(product)}
-                    >
-                      <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-contain drop-shadow-xl" />
-                    </div>
-
-                    <div className="flex-grow flex flex-col justify-between">
-                      <div>
-                        {/* Título e Condição - Empilhados no mobile para não cortar o texto */}
-                        <div 
-                          className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 mb-1.5 sm:mb-1 cursor-pointer"
-                          onClick={() => openProductModal(product)}
-                        >
-                          <h3 className="text-sm sm:text-lg font-bold text-white group-hover:text-purple-200 transition-colors leading-tight">{product.name}</h3>
-                          {product.condition && <span className="bg-tcg-primary/20 text-tcg-primary border border-tcg-primary/30 text-[8px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">{product.condition}</span>}
-                        </div>
-                        <p className="text-[10px] sm:text-xs text-gray-400 mb-1.5 sm:mb-2 truncate">{product.game} {product.expansion && `• ${product.expansion}`}</p>
-                        <p className="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3">Estoque: <strong className="text-gray-200">{product.stock} un.</strong></p>
-                      </div>
+                {visibleProducts.map((product) => {
+                  const cardNum = getCardNumber(product);
+                  return (
+                    <div key={product.id} className="relative group bg-tcg-surface backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl sm:rounded-3xl transition-all duration-500 hover:-translate-y-2 hover:shadow-card-hover hover:border-tcg-accent/40 flex flex-col h-full">
+                      <div className="absolute top-3 right-3 sm:top-6 sm:right-6 z-20 bg-tcg-background/90 backdrop-blur-sm border border-white/10 text-gray-300 text-[8px] sm:text-[10px] font-bold px-1.5 py-0.5 sm:px-2 sm:py-1 rounded uppercase tracking-wider">{product.category}</div>
                       
-                      {/* Preço e Botão Comprar - Botão estica no mobile para facilitar o clique */}
-                      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between mt-auto pt-3 sm:pt-4 border-t border-white/5 gap-2 sm:gap-0">
-                        <span className="text-base sm:text-xl font-black text-tcg-primary">R$ {product.price.toFixed(2).replace('.', ',')}</span>
-                        <button onClick={() => openProductModal(product)} className="w-full xl:w-auto bg-white/5 hover:bg-tcg-primary hover:text-white border border-white/10 hover:border-tcg-primary text-gray-300 font-medium py-1.5 px-3 sm:py-2 sm:px-4 rounded-lg sm:rounded-xl transition-all duration-300 text-xs sm:text-sm">Comprar</button>
+                      <div 
+                        className="w-full aspect-[460/640] bg-transparent rounded-lg sm:rounded-xl mb-3 sm:mb-4 relative overflow-hidden group flex items-center justify-center cursor-pointer"
+                        onClick={() => openProductModal(product)}
+                      >
+                        <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-contain drop-shadow-xl" />
+                      </div>
+
+                      <div className="flex-grow flex flex-col justify-between">
+                        <div>
+                          <div 
+                            className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 mb-1.5 sm:mb-1 cursor-pointer"
+                            onClick={() => openProductModal(product)}
+                          >
+                            <h3 className="text-sm sm:text-lg font-bold text-white group-hover:text-purple-200 transition-colors leading-tight">{product.name}</h3>
+                            {product.condition && <span className="bg-tcg-primary/20 text-tcg-primary border border-tcg-primary/30 text-[8px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">{product.condition}</span>}
+                          </div>
+                          <p className="text-[10px] sm:text-xs text-gray-400 mb-1.5 sm:mb-2 truncate">
+                            {product.game}
+                            {product.expansion ? ` • ${product.expansion}` : ''}
+                            {cardNum ? ` #${cardNum}` : ''}
+                          </p>
+                          <p className="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3">Estoque: <strong className="text-gray-200">{product.stock} un.</strong></p>
+                        </div>
+                        <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between mt-auto pt-3 sm:pt-4 border-t border-white/5 gap-2 sm:gap-0">
+                          <span className="text-base sm:text-xl font-black text-tcg-primary">R$ {product.price.toFixed(2).replace('.', ',')}</span>
+                          <button onClick={() => openProductModal(product)} className="w-full xl:w-auto bg-white/5 hover:bg-tcg-primary hover:text-white border border-white/10 hover:border-tcg-primary text-gray-300 font-medium py-1.5 px-3 sm:py-2 sm:px-4 rounded-lg sm:rounded-xl transition-all duration-300 text-xs sm:text-sm">Comprar</button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {visibleCount < filteredProducts.length && (
@@ -712,41 +771,53 @@ function App() {
         </main>
       )}
 
-      {/* Backdrop onClick={closeProductModal} */}
+      {/* overflow-y-auto) */}
       {selectedProduct && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm"
           onClick={closeProductModal}
         >
-          {/* Caixa do Modal com stopPropagation para não fechar quando clicar dentro dela */}
           <div 
-            className="bg-tcg-surface border border-white/10 rounded-3xl max-w-2xl w-full p-6 md:p-8 relative shadow-2xl flex flex-col md:flex-row gap-8"
+            className="bg-tcg-surface border border-white/10 rounded-2xl sm:rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 md:p-8 relative shadow-2xl flex flex-col md:flex-row gap-4 sm:gap-6 md:gap-8"
             onClick={(e) => e.stopPropagation()}
           >
-            <button onClick={closeProductModal} className="absolute top-4 right-4 text-gray-400 hover:text-white text-3xl font-light leading-none transition-colors">&times;</button>
+            <button 
+              onClick={closeProductModal} 
+              className="sticky md:absolute top-0 md:top-4 right-0 md:right-4 ml-auto z-20 bg-black/60 md:bg-transparent w-8 h-8 rounded-full flex items-center justify-center text-gray-300 hover:text-white text-2xl md:text-3xl font-light leading-none transition-colors shrink-0"
+              aria-label="Fechar"
+            >
+              &times;
+            </button>
             
-            <div className="w-1/2 sm:w-2/5 md:w-1/3 mx-auto aspect-[460/640] bg-transparent rounded-2xl overflow-hidden shrink-0 relative flex items-center justify-center">
-               <img src={selectedProduct.image} alt={selectedProduct.name} loading="lazy" decoding="async" className="w-full h-full object-contain drop-shadow-2xl" />
+            <div className="w-36 sm:w-44 md:w-1/3 mx-auto aspect-[460/640] bg-transparent rounded-xl sm:rounded-2xl overflow-hidden shrink-0 relative flex items-center justify-center -mt-6 md:mt-0">
+              <img src={selectedProduct.image} alt={selectedProduct.name} loading="lazy" decoding="async" className="w-full h-full object-contain drop-shadow-2xl" />
             </div>
 
             <div className="flex-1 flex flex-col">
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <h2 className="text-3xl font-black text-white">{selectedProduct.name}</h2>
-                  {selectedProduct.condition && <span className="bg-tcg-primary/20 text-tcg-primary border border-tcg-primary/30 text-xs font-bold px-2 py-0.5 rounded">Condição: {selectedProduct.condition}</span>}
+              <div className="mb-3 sm:mb-6">
+                <div className="flex items-center gap-2 mb-1.5 sm:mb-2 flex-wrap">
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight">{selectedProduct.name}</h2>
+                  {selectedProduct.condition && <span className="bg-tcg-primary/20 text-tcg-primary border border-tcg-primary/30 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded">Condição: {selectedProduct.condition}</span>}
                   {selectedProduct.stock > 0 ? (
-                    <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs uppercase font-bold px-2 py-0.5 rounded">Em Estoque ({selectedProduct.stock} un.)</span>
+                    <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-[11px] sm:text-xs uppercase font-bold px-2 py-0.5 rounded">Em Estoque ({selectedProduct.stock} un.)</span>
                   ) : (
-                    <span className="bg-red-500/20 text-red-400 border border-red-500/30 text-xs uppercase font-bold px-2 py-0.5 rounded">Esgotado</span>
+                    <span className="bg-red-500/20 text-red-400 border border-red-500/30 text-[11px] sm:text-xs uppercase font-bold px-2 py-0.5 rounded">Esgotado</span>
                   )}
                 </div>
-                <p className="text-sm text-gray-400">{selectedProduct.game} {selectedProduct.expansion && `• ${selectedProduct.expansion}`}</p>
+                <p className="text-xs sm:text-sm text-gray-400">
+                  {selectedProduct.game}
+                  {selectedProduct.expansion ? ` • Coleção: ${selectedProduct.expansion}` : ''}
+                  {getCardNumber(selectedProduct) ? ` • Nº ${getCardNumber(selectedProduct)}` : ''}
+                </p>
               </div>
-              <span className="text-4xl font-black text-tcg-primary mb-8">R$ {selectedProduct.price.toFixed(2).replace('.', ',')}</span>
+
+              <span className="text-2xl sm:text-3xl md:text-4xl font-black text-tcg-primary mb-4 sm:mb-6">
+                R$ {selectedProduct.price.toFixed(2).replace('.', ',')}
+              </span>
               
-              <div className="bg-tcg-background/50 border border-tcg-accent/30 rounded-xl p-5 mb-8">
-                <p className="text-sm text-gray-300 font-medium mb-3"><span className="text-tcg-accent font-bold">⚠️ Atenção:</span> Não possuímos loja física para retirada.</p>
-                <ul className="text-xs text-gray-400 space-y-2 list-disc list-inside">
+              <div className="bg-tcg-background/50 border border-tcg-accent/30 rounded-xl p-3.5 sm:p-5 mb-4 sm:mb-6">
+                <p className="text-xs sm:text-sm text-gray-300 font-medium mb-2"><span className="text-tcg-accent font-bold">⚠️ Atenção:</span> Não possuímos loja física para retirada.</p>
+                <ul className="text-[11px] sm:text-xs text-gray-400 space-y-1.5 list-disc list-inside">
                   <li>Envios via Correios (frete por conta do comprador).</li>
                   <li>Entrega pessoalmente apenas mediante combinação prévia.</li>
                   <li>Sempre verifique a versão do produto que você está tentando comprar.</li>
@@ -754,35 +825,35 @@ function App() {
                 </ul>
               </div>
 
-              <div className="mb-8">
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Simular Frete</label>
+              <div className="mb-4 sm:mb-6">
+                <label className="block text-[11px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Simular Frete</label>
                 <div className="flex gap-2">
-                  <input type="text" placeholder="Digite seu CEP" value={cep} onChange={(e) => setCep(e.target.value)} className="flex-1 bg-black/50 border border-white/10 rounded-xl px-5 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-tcg-primary transition-colors" />
-                  <button onClick={handleCalculateShipping} disabled={isLoadingCep} className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50">
+                  <input type="text" placeholder="Digite seu CEP" value={cep} onChange={(e) => setCep(e.target.value)} className="flex-1 min-w-0 bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 sm:px-5 sm:py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-tcg-primary transition-colors" />
+                  <button onClick={handleCalculateShipping} disabled={isLoadingCep} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shrink-0">
                     {isLoadingCep ? '...' : 'Calcular'}
                   </button>
                 </div>
                 {shippingInfo && (
-                  <div className="mt-4 text-sm bg-black/30 p-4 rounded-xl border border-white/5">
-                    <p className="text-gray-300 mb-3">Envio para <strong className="text-white">{shippingInfo.city} - {shippingInfo.state}</strong></p>
-                    <div className="flex justify-between items-center py-2 border-b border-white/5"><span className="text-gray-400">PAC (Simulado)</span><strong className="text-white">R$ {shippingInfo.pac.toFixed(2).replace('.', ',')}</strong></div>
-                    <div className="flex justify-between items-center py-2 pt-3"><span className="text-gray-400">Sedex (Simulado)</span><strong className="text-white">R$ {shippingInfo.sedex.toFixed(2).replace('.', ',')}</strong></div>
+                  <div className="mt-3 text-xs sm:text-sm bg-black/30 p-3 sm:p-4 rounded-xl border border-white/5">
+                    <p className="text-gray-300 mb-2">Envio para <strong className="text-white">{shippingInfo.city} - {shippingInfo.state}</strong></p>
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5"><span className="text-gray-400">PAC (Simulado)</span><strong className="text-white">R$ {shippingInfo.pac.toFixed(2).replace('.', ',')}</strong></div>
+                    <div className="flex justify-between items-center py-1.5 pt-2"><span className="text-gray-400">Sedex (Simulado)</span><strong className="text-white">R$ {shippingInfo.sedex.toFixed(2).replace('.', ',')}</strong></div>
                   </div>
                 )}
               </div>
               
-              <div className="mt-auto flex flex-col gap-3">
+              <div className="mt-auto flex flex-col gap-2.5 sm:gap-3 pt-2">
                 <button 
                   onClick={() => addToCart(selectedProduct)} 
                   disabled={selectedProduct.stock === 0}
-                  className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-4 rounded-2xl transition-all duration-300 flex justify-center items-center gap-2 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-3 sm:py-4 rounded-xl sm:rounded-2xl transition-all duration-300 flex justify-center items-center gap-2 text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   🛒 Adicionar ao Carrinho
                 </button>
                 <button 
                   onClick={handleWhatsAppCheckout} 
                   disabled={selectedProduct.stock === 0}
-                  className="w-full bg-tcg-primary hover:bg-tcg-glow shadow-neon text-white font-bold py-4 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 flex justify-center items-center gap-2 text-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="w-full bg-tcg-primary hover:bg-tcg-glow shadow-neon text-white font-bold py-3 sm:py-4 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:-translate-y-1 flex justify-center items-center gap-2 text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   Comprar
                 </button>
