@@ -1,18 +1,5 @@
 [
   {
-    "id": "GC-7E215471",
-    "name": "Poltchageist",
-    "category": "Cartas Avulsas",
-    "game": "Pokemon",
-    "expansion": "PBL",
-    "condition": "NM",
-    "price": 1,
-    "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/PBL/PBL_005_R_PT_LG.png",
-    "featured": true,
-    "inStock": true,
-    "stock": 22
-  },
-  {
     "id": "GC-7CAF0035",
     "name": "Energia Borbulhante (Foil)",
     "category": "Cartas Avulsas",
@@ -125,7 +112,7 @@
     "condition": "NM",
     "price": 4,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/POR/POR_088_R_PT_LG.png",
-    "featured": false,
+    "featured": true,
     "inStock": true,
     "stock": 4
   },
@@ -153,7 +140,7 @@
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/TWM/TWM_166_R_PT_LG.png",
     "featured": false,
     "inStock": true,
-    "stock": 4
+    "stock": 3
   },
   {
     "id": "GC-BE8393D8",
@@ -242,7 +229,7 @@
     "condition": "NM",
     "price": 1,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/MEG/MEG_131_R_PT_LG.png",
-    "featured": true,
+    "featured": false,
     "inStock": true,
     "stock": 30
   },
@@ -1113,7 +1100,7 @@
     "condition": "NM",
     "price": 2,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/TWM/TWM_155_R_PT_LG.png",
-    "featured": true,
+    "featured": false,
     "inStock": true,
     "stock": 2
   },
@@ -1256,7 +1243,7 @@
     "condition": "NM",
     "price": 1,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/PFL/PFL_087_R_PT_LG.png",
-    "featured": false,
+    "featured": true,
     "inStock": true,
     "stock": 16
   },
@@ -1373,7 +1360,7 @@
     "condition": "NM",
     "price": 3,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/WHT/WHT_084_R_PT_LG.png",
-    "featured": false,
+    "featured": true,
     "inStock": true,
     "stock": 7
   },
@@ -1438,7 +1425,7 @@
     "condition": "NM",
     "price": 2,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/POR/POR_076_R_PT_LG.png",
-    "featured": true,
+    "featured": false,
     "inStock": true,
     "stock": 5
   },
@@ -1477,7 +1464,7 @@
     "condition": "NM",
     "price": 2,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/ASC/ASC_183_R_PT_LG.png",
-    "featured": false,
+    "featured": true,
     "inStock": true,
     "stock": 3
   },
@@ -2231,7 +2218,7 @@
     "condition": "NM",
     "price": 2,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/CRI/CRI_080_R_PT_LG.png",
-    "featured": true,
+    "featured": false,
     "inStock": true,
     "stock": 10
   },
@@ -2312,6 +2299,19 @@
     "featured": false,
     "inStock": true,
     "stock": 2
+  },
+  {
+    "id": "GC-7E215471",
+    "name": "Poltchageist",
+    "category": "Cartas Avulsas",
+    "game": "Pokemon",
+    "expansion": "PBL",
+    "condition": "NM",
+    "price": 1,
+    "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/PBL/PBL_005_R_PT_LG.png",
+    "featured": true,
+    "inStock": true,
+    "stock": 22
   },
   {
     "id": "GC-1E15F6E1",
@@ -3728,7 +3728,7 @@
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/DRI/DRI_078_R_PT_LG.png",
     "featured": false,
     "inStock": true,
-    "stock": 4
+    "stock": 3
   },
   {
     "id": "GC-9D9BC1A6",
@@ -4090,7 +4090,7 @@
     "condition": "NM",
     "price": 2,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/PBL/PBL_034_R_PT_LG.png",
-    "featured": false,
+    "featured": true,
     "inStock": true,
     "stock": 10
   },
@@ -5612,8 +5612,8 @@
     "price": 1,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/CRI/CRI_061_R_PT_LG.png",
     "featured": false,
-    "inStock": true,
-    "stock": 1
+    "inStock": false,
+    "stock": 0
   },
   {
     "id": "GC-C8DC2DCA",
@@ -5858,7 +5858,7 @@
     "condition": "NM",
     "price": 1,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/CRI/CRI_070_R_PT_LG.png",
-    "featured": false,
+    "featured": true,
     "inStock": true,
     "stock": 3
   },
@@ -6261,7 +6261,7 @@
     "condition": "NM",
     "price": 1,
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/PBL/PBL_068_R_PT_LG.png",
-    "featured": false,
+    "featured": true,
     "inStock": true,
     "stock": 10
   },
@@ -6277,5 +6277,18 @@
     "featured": false,
     "inStock": true,
     "stock": 4
+  },
+  {
+    "id": "GC-73806488",
+    "name": "Deck Completo Alakazam 2026",
+    "category": "Decks & Selados",
+    "game": "Pokemon",
+    "expansion": "2026",
+    "condition": "SP",
+    "price": 250,
+    "image": "https://i.imgur.com/7xkL7a9.jpeg",
+    "featured": false,
+    "inStock": true,
+    "stock": 1
   }
 ]
