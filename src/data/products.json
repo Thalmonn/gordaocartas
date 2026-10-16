@@ -114,7 +114,7 @@
     "image": "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/POR/POR_088_R_PT_LG.png",
     "featured": true,
     "inStock": true,
-    "stock": 4
+    "stock": 2
   },
   {
     "id": "GC-95DAABC2",
@@ -6277,18 +6277,5 @@
     "featured": false,
     "inStock": true,
     "stock": 4
-  },
-  {
-    "id": "GC-73806488",
-    "name": "Deck Completo Alakazam 2026",
-    "category": "Decks & Selados",
-    "game": "Pokemon",
-    "expansion": "2026",
-    "condition": "SP",
-    "price": 250,
-    "image": "https://i.imgur.com/7xkL7a9.jpeg",
-    "featured": false,
-    "inStock": true,
-    "stock": 1
   }
 ]
