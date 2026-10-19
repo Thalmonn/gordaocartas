@@ -4,6 +4,8 @@ import banner1 from './assets/banner1.webp';
 import banner2 from './assets/banner2.webp';
 import banner3 from './assets/banner3.webp';
 
+const GIST_ID = "198ebcf011ad793c7f552267a3bd1f04";
+
 const getCardNumber = (product) => {
   if (!product) return '';
   if (product.number) return product.number.toString();
@@ -24,6 +26,21 @@ const formatWhatsappCardDetails = (product) => {
 };
 
 function App() {
+  const [products, setProducts] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('gc-products-cache');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {
+          console.error("Erro ao ler cache de produtos:", e);
+        }
+      }
+    }
+    return productsData;
+  });
+
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window !== 'undefined' && window.location.href.includes('/cadastrar/produto')) {
       return 'CadastrarProduto';
@@ -65,6 +82,64 @@ function App() {
   });
 
   useEffect(() => {
+    if (!GIST_ID || GIST_ID === "gistId") return;
+
+    const syncStockFromGist = async () => {
+      try {
+        const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+          cache: 'no-store'
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data.files) return;
+
+        const fileKey = Object.keys(data.files).find(k => k.endsWith('.json')) || 'products.json';
+        const fileObj = data.files[fileKey];
+        if (!fileObj) return;
+
+        let freshProducts = null;
+        if (fileObj.truncated && fileObj.raw_url) {
+          const rawRes = await fetch(`${fileObj.raw_url}?t=${Date.now()}`, { cache: 'no-store' });
+          freshProducts = await rawRes.json();
+        } else if (fileObj.content) {
+          freshProducts = JSON.parse(fileObj.content);
+        }
+
+        if (Array.isArray(freshProducts) && freshProducts.length > 0) {
+          setProducts(freshProducts);
+          localStorage.setItem('gc-products-cache', JSON.stringify(freshProducts));
+        }
+      } catch (err) {
+        console.warn("Usando catálogo local:", err);
+      }
+    };
+
+    syncStockFromGist();
+  }, []);
+
+  useEffect(() => {
+    if (selectedProduct) {
+      const updated = products.find(p => p.id === selectedProduct.id);
+      if (updated) setSelectedProduct(updated);
+    }
+
+    setCart(prevCart => {
+      if (prevCart.length === 0) return prevCart;
+      return prevCart.map(cartItem => {
+        const updatedProduct = products.find(p => p.id === cartItem.id);
+        if (!updatedProduct) return cartItem;
+        return {
+          ...cartItem,
+          price: updatedProduct.price,
+          stock: updatedProduct.stock,
+          inStock: updatedProduct.inStock,
+          qty: updatedProduct.stock > 0 ? Math.min(cartItem.qty, updatedProduct.stock) : 0
+        };
+      }).filter(item => item.qty > 0);
+    });
+  }, [products]);
+
+  useEffect(() => {
     localStorage.setItem('gc-cart', JSON.stringify(cart));
   }, [cart]);
 
@@ -72,6 +147,7 @@ function App() {
   const cartCount = useMemo(() => cart.reduce((acc, item) => acc + item.qty, 0), [cart]);
 
   const addToCart = (product) => {
+    if (product.stock <= 0) return;
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -219,7 +295,7 @@ function App() {
   }, [selectedProduct]);
 
   const filteredProducts = useMemo(() => {
-    return productsData.filter(product => {
+    const matches = products.filter(product => {
       const matchesCategory = activeCategory === 'Todos' || product.category === activeCategory;
       const cardNum = getCardNumber(product);
       const q = searchQuery.toLowerCase();
@@ -230,14 +306,28 @@ function App() {
         (cardNum && cardNum.toLowerCase().includes(q));
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, searchQuery]);
+
+    return [...matches].sort((a, b) => {
+      const aAvailable = a.stock > 0 ? 1 : 0;
+      const bAvailable = b.stock > 0 ? 1 : 0;
+      return bAvailable - aAvailable;
+    });
+  }, [activeCategory, searchQuery, products]);
 
   const visibleProducts = useMemo(() => {
     return filteredProducts.slice(0, visibleCount);
   }, [filteredProducts, visibleCount]);
 
-  const featuredProduct = useMemo(() => productsData.find(product => product.featured === true) || null, []);
-  const baseCarouselCards = useMemo(() => productsData.filter(product => product.featured === true), []);
+  const featuredProduct = useMemo(() => {
+    return products.find(product => product.featured === true && product.stock > 0) || 
+           products.find(product => product.featured === true) || 
+           null;
+  }, [products]);
+
+  const baseCarouselCards = useMemo(() => {
+    return products.filter(product => product.featured === true && product.stock > 0);
+  }, [products]);
+
   const carouselTrack = [...baseCarouselCards, ...baseCarouselCards, ...baseCarouselCards, ...baseCarouselCards];
   const carouselAnimationDuration = carouselTrack.length > 0 ? `${carouselTrack.length * 3}s` : '30s';
 
@@ -271,6 +361,7 @@ function App() {
   };
 
   const handleWhatsAppCheckout = () => {
+    if (!selectedProduct || selectedProduct.stock <= 0) return;
     const phoneNumber = "5583998268170"; 
     const details = formatWhatsappCardDetails(selectedProduct);
     let message = `Olá, Gordão Cartas! Tenho interesse no produto:\n\n*${selectedProduct.name}* ${details}\nValor: R$ ${selectedProduct.price.toFixed(2).replace('.', ',')}`;
@@ -719,15 +810,37 @@ function App() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-6">
                 {visibleProducts.map((product) => {
                   const cardNum = getCardNumber(product);
+                  const isOutOfStock = product.stock <= 0;
                   return (
-                    <div key={product.id} className="relative group bg-tcg-surface backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl sm:rounded-3xl transition-all duration-500 hover:-translate-y-2 hover:shadow-card-hover hover:border-tcg-accent/40 flex flex-col h-full">
-                      <div className="absolute top-3 right-3 sm:top-6 sm:right-6 z-20 bg-tcg-background/90 backdrop-blur-sm border border-white/10 text-gray-300 text-[8px] sm:text-[10px] font-bold px-1.5 py-0.5 sm:px-2 sm:py-1 rounded uppercase tracking-wider">{product.category}</div>
+                    <div 
+                      key={product.id} 
+                      className={`relative group bg-tcg-surface backdrop-blur-xl border p-3 sm:p-4 rounded-2xl sm:rounded-3xl transition-all duration-500 flex flex-col h-full ${
+                        isOutOfStock 
+                          ? 'border-red-500/20 opacity-75' 
+                          : 'border-white/10 hover:-translate-y-2 hover:shadow-card-hover hover:border-tcg-accent/40'
+                      }`}
+                    >
+                      {isOutOfStock ? (
+                        <div className="absolute top-3 right-3 sm:top-6 sm:right-6 z-20 bg-red-600/90 backdrop-blur-sm border border-red-400/30 text-white text-[8px] sm:text-[10px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded uppercase tracking-wider shadow-lg">
+                          Esgotado
+                        </div>
+                      ) : (
+                        <div className="absolute top-3 right-3 sm:top-6 sm:right-6 z-20 bg-tcg-background/90 backdrop-blur-sm border border-white/10 text-gray-300 text-[8px] sm:text-[10px] font-bold px-1.5 py-0.5 sm:px-2 sm:py-1 rounded uppercase tracking-wider">
+                          {product.category}
+                        </div>
+                      )}
                       
                       <div 
                         className="w-full aspect-[460/640] bg-transparent rounded-lg sm:rounded-xl mb-3 sm:mb-4 relative overflow-hidden group flex items-center justify-center cursor-pointer"
                         onClick={() => openProductModal(product)}
                       >
-                        <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-contain drop-shadow-xl" />
+                        <img 
+                          src={product.image} 
+                          alt={product.name} 
+                          loading="lazy" 
+                          decoding="async" 
+                          className={`w-full h-full object-contain drop-shadow-xl transition-all ${isOutOfStock ? 'grayscale-[50%] opacity-60' : ''}`} 
+                        />
                       </div>
 
                       <div className="flex-grow flex flex-col justify-between">
@@ -744,11 +857,31 @@ function App() {
                             {product.expansion ? ` • ${product.expansion}` : ''}
                             {cardNum ? ` #${cardNum}` : ''}
                           </p>
-                          <p className="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3">Estoque: <strong className="text-gray-200">{product.stock} un.</strong></p>
+                          {isOutOfStock ? (
+                            <p className="text-[9px] sm:text-[11px] text-red-400 font-bold mb-2 sm:mb-3 uppercase">Sem estoque</p>
+                          ) : (
+                            <p className="text-[9px] sm:text-[11px] text-gray-400 mb-2 sm:mb-3">Estoque: <strong className="text-gray-200">{product.stock} un.</strong></p>
+                          )}
                         </div>
                         <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between mt-auto pt-3 sm:pt-4 border-t border-white/5 gap-2 sm:gap-0">
-                          <span className="text-base sm:text-xl font-black text-tcg-primary">R$ {product.price.toFixed(2).replace('.', ',')}</span>
-                          <button onClick={() => openProductModal(product)} className="w-full xl:w-auto bg-white/5 hover:bg-tcg-primary hover:text-white border border-white/10 hover:border-tcg-primary text-gray-300 font-medium py-1.5 px-3 sm:py-2 sm:px-4 rounded-lg sm:rounded-xl transition-all duration-300 text-xs sm:text-sm">Comprar</button>
+                          <span className={`text-base sm:text-xl font-black ${isOutOfStock ? 'text-gray-500 line-through' : 'text-tcg-primary'}`}>
+                            R$ {product.price.toFixed(2).replace('.', ',')}
+                          </span>
+                          {isOutOfStock ? (
+                            <button 
+                              disabled 
+                              className="w-full xl:w-auto bg-red-500/10 border border-red-500/30 text-red-400 font-bold py-1.5 px-3 sm:py-2 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm cursor-not-allowed"
+                            >
+                              Esgotado
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => openProductModal(product)} 
+                              className="w-full xl:w-auto bg-white/5 hover:bg-tcg-primary hover:text-white border border-white/10 hover:border-tcg-primary text-gray-300 font-medium py-1.5 px-3 sm:py-2 sm:px-4 rounded-lg sm:rounded-xl transition-all duration-300 text-xs sm:text-sm"
+                            >
+                              Comprar
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -771,7 +904,6 @@ function App() {
         </main>
       )}
 
-      {/* overflow-y-auto) */}
       {selectedProduct && (
         <div 
           className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm"
@@ -790,7 +922,13 @@ function App() {
             </button>
             
             <div className="w-36 sm:w-44 md:w-1/3 mx-auto aspect-[460/640] bg-transparent rounded-xl sm:rounded-2xl overflow-hidden shrink-0 relative flex items-center justify-center -mt-6 md:mt-0">
-              <img src={selectedProduct.image} alt={selectedProduct.name} loading="lazy" decoding="async" className="w-full h-full object-contain drop-shadow-2xl" />
+              <img 
+                src={selectedProduct.image} 
+                alt={selectedProduct.name} 
+                loading="lazy" 
+                decoding="async" 
+                className={`w-full h-full object-contain drop-shadow-2xl ${selectedProduct.stock <= 0 ? 'grayscale-[50%] opacity-70' : ''}`} 
+              />
             </div>
 
             <div className="flex-1 flex flex-col">
@@ -845,17 +983,17 @@ function App() {
               <div className="mt-auto flex flex-col gap-2.5 sm:gap-3 pt-2">
                 <button 
                   onClick={() => addToCart(selectedProduct)} 
-                  disabled={selectedProduct.stock === 0}
+                  disabled={selectedProduct.stock <= 0}
                   className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-3 sm:py-4 rounded-xl sm:rounded-2xl transition-all duration-300 flex justify-center items-center gap-2 text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  🛒 Adicionar ao Carrinho
+                  {selectedProduct.stock <= 0 ? '🚫 Produto Esgotado' : '🛒 Adicionar ao Carrinho'}
                 </button>
                 <button 
                   onClick={handleWhatsAppCheckout} 
-                  disabled={selectedProduct.stock === 0}
+                  disabled={selectedProduct.stock <= 0}
                   className="w-full bg-tcg-primary hover:bg-tcg-glow shadow-neon text-white font-bold py-3 sm:py-4 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:-translate-y-1 flex justify-center items-center gap-2 text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  Comprar
+                  {selectedProduct.stock <= 0 ? 'Indisponível' : 'Comprar'}
                 </button>
               </div>
 
@@ -888,7 +1026,7 @@ function App() {
         </div>
       </footer>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
