@@ -3,7 +3,9 @@ import productsData from './data/products.json';
 import banner1 from './assets/banner1.webp';
 import banner2 from './assets/banner2.webp';
 import banner3 from './assets/banner3.webp';
+import retiredImg from './assets/retired.jpg';
 
+const IS_SITE_RETIRED = true;
 const GIST_ID = "198ebcf011ad793c7f552267a3bd1f04";
 
 const getCardNumber = (product) => {
@@ -82,7 +84,7 @@ function App() {
   });
 
   useEffect(() => {
-    if (!GIST_ID || GIST_ID === "gistId") return;
+    if (IS_SITE_RETIRED || !GIST_ID || GIST_ID === "gistId") return;
 
     const syncStockFromGist = async () => {
       try {
@@ -118,6 +120,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (IS_SITE_RETIRED) return;
     if (selectedProduct) {
       const updated = products.find(p => p.id === selectedProduct.id);
       if (updated) setSelectedProduct(updated);
@@ -140,6 +143,7 @@ function App() {
   }, [products]);
 
   useEffect(() => {
+    if (IS_SITE_RETIRED) return;
     localStorage.setItem('gc-cart', JSON.stringify(cart));
   }, [cart]);
 
@@ -190,7 +194,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (currentView !== 'Home') return;
+    if (IS_SITE_RETIRED || currentView !== 'Home') return;
     
     const timer = setInterval(() => {
       setCurrentBannerIndex((prevIndex) => (prevIndex + 1) % banners.length);
@@ -200,6 +204,7 @@ function App() {
   }, [currentView, banners.length]);
 
   useEffect(() => {
+    if (IS_SITE_RETIRED) return;
     const handlePopState = (event) => {
       if (modalHistoryPushedRef.current) {
         modalHistoryPushedRef.current = false;
@@ -285,6 +290,7 @@ function App() {
   };
 
   useEffect(() => {
+    if (IS_SITE_RETIRED) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && selectedProduct) {
         closeProductModal();
@@ -392,6 +398,23 @@ function App() {
     setGeneratedJson(JSON.stringify(finalProduct, null, 2) + ',');
   };
 
+  if (IS_SITE_RETIRED) {
+    return (
+      <main className="fixed inset-0 z-[9999] w-screen h-screen bg-tcg-background flex items-center justify-center p-3 sm:p-6 md:p-10 overflow-hidden select-none">
+        <div className="absolute w-72 sm:w-[500px] h-72 sm:h-[500px] bg-tcg-primary/20 blur-[100px] sm:blur-[140px] rounded-full pointer-events-none -translate-x-1/4"></div>
+        <div className="absolute w-72 sm:w-[500px] h-72 sm:h-[500px] bg-tcg-accent/25 blur-[100px] sm:blur-[140px] rounded-full pointer-events-none translate-x-1/4"></div>
+        <div className="relative z-10 w-full max-w-6xl h-full flex items-center justify-center">
+          <img
+            src={retiredImg}
+            alt="RETIRED"
+            draggable="false"
+            className="w-full h-auto max-h-[88vh] object-contain rounded-2xl sm:rounded-3xl shadow-[0_0_80px_rgba(0,0,0,0.95)] border border-white/10 pointer-events-none"
+          />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-tcg-background text-gray-200 font-sans relative overflow-x-hidden selection:bg-tcg-primary selection:text-white">
       <header className="fixed w-full top-0 z-50 bg-tcg-background/90 backdrop-blur-md border-b border-white/5 py-3 px-4 md:px-12 flex justify-between items-center gap-4">
@@ -445,7 +468,6 @@ function App() {
         </div>
       </header>
 
-      {/* DRAWER DO CARRINHO */}
       <div className={`fixed inset-0 z-[60] flex justify-end transition-opacity duration-300 ${isCartOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
         <div className={`relative w-96 max-w-full bg-tcg-background border-l border-white/10 h-full shadow-2xl flex flex-col transition-transform duration-300 transform ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -515,7 +537,6 @@ function App() {
         </div>
       </div>
 
-      {/* MENU MOBILE */}
       <div className={`fixed inset-0 z-40 flex justify-end transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
         <div className={`relative w-80 max-w-full bg-tcg-background border-l border-white/10 h-full shadow-2xl flex flex-col transition-transform duration-300 transform ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
